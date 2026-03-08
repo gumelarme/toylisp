@@ -1,10 +1,6 @@
-package main
+package text
 
-import "core:fmt"
 import "core:unicode/utf8"
-
-y :: 123
-x: int : 123
 
 TType :: enum {
 	Left_Paren,
@@ -20,27 +16,11 @@ TType_String :: #sparse[TType]string {
 	.Number      = "Number",
 }
 
-State :: enum {
-	Start,
-	Identifier,
-	Number,
-	End,
-}
-
 Token :: struct {
 	type:  TType,
 	value: string,
 }
 
-main :: proc() {
-	code := string_lexer("(- 1000 (add-123 120 123))")
-	tokens, err := tokenize(&code)
-	if err != nil {
-		panic(fmt.tprintf("Syntax error: %v", err))
-	}
-
-	fmt.printfln("The tokens are %v", tokens)
-}
 
 Lexer :: struct {
 	source: string,
@@ -86,7 +66,6 @@ expect :: proc(lex: ^Lexer, expected_chars: ..rune) -> bool {
 
 Syntax_Error :: struct {
 	reason:   string,
-	state:    State,
 	// TODO: make this into (col, row) when file lexer is implemented
 	position: uint,
 }
@@ -135,7 +114,7 @@ next_token :: proc(lex: ^Lexer) -> (Token, Error) {
 	if is_digit(char) {
 		tok := parse_digit(lex)
 		if !expect(lex, ' ', '(', ')') {
-			return Token{}, Syntax_Error{"unexpected char", .Number, lex.cursor}
+			return Token{}, Syntax_Error{"unexpected char", lex.cursor}
 		}
 		return tok, nil
 	}
@@ -172,19 +151,4 @@ parse_identifier :: proc(lex: ^Lexer) -> Token {
 	}
 
 	return consume(lex, .Identifier)
-}
-
-is_digit :: proc(r: rune) -> bool {
-	return r >= '0' && r <= '9'
-}
-
-is_alphabet :: proc(r: rune) -> bool {
-	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z')
-}
-
-is_valid_symbol :: proc(r: rune) -> bool {
-	for sym in "_-+=><?!" {
-		if sym == r {return true}
-	}
-	return false
 }
