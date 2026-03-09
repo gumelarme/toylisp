@@ -1,7 +1,6 @@
 package test
 
 import "core:fmt"
-import "core:log"
 import "core:strings"
 import "core:testing"
 import "src:text"
@@ -30,7 +29,10 @@ compare_tokens :: proc(a, b: []text.Token) -> (bool, []string) {
 @(test)
 test_lexer_number :: proc(t: ^testing.T) {
 	source := text.string_lexer("123a")
+	defer delete(source.buffer)
+
 	tokens, err := text.tokenize(&source)
+	defer text.delete_tokens(tokens)
 
 	// TODO: show what error it actually got,
 	// type_info_of(typeid_of(type_of(X))) doesnt work
@@ -41,7 +43,10 @@ test_lexer_number :: proc(t: ^testing.T) {
 @(test)
 test_lexer_simple :: proc(t: ^testing.T) {
 	source := text.string_lexer("(+ 1 2)")
+	defer delete(source.buffer)
+
 	tokens, err := text.tokenize(&source)
+	defer text.delete_tokens(tokens)
 
 	testing.expect(t, err == nil, "should not return error")
 
@@ -60,9 +65,13 @@ test_lexer_simple :: proc(t: ^testing.T) {
 @(test)
 test_multiline_string :: proc(t: ^testing.T) {
 	source_code := strings.join({"(+ 888", "(* 12 3))"}, "\n")
+	defer delete(source_code)
+
 	source := text.string_lexer(source_code)
+	defer delete(source.buffer)
 
 	tokens, err := text.tokenize(&source)
+	defer text.delete_tokens(tokens)
 
 	testing.expect_value(t, err, nil)
 	testing.expect_value(t, source.line, 2)
@@ -82,5 +91,4 @@ test_multiline_string :: proc(t: ^testing.T) {
 
 	is_ok, reasons := compare_tokens(expected, tokens)
 	testing.expect(t, is_ok, strings.join(reasons, "\n"))
-
 }

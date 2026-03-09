@@ -24,6 +24,17 @@ Token :: struct {
 	value: string,
 }
 
+delete_token :: proc(tok: Token) {
+	delete(tok.value)
+}
+
+delete_tokens :: proc(tokens: []Token) {
+	for tok in tokens {
+		delete_token(tok)
+	}
+	delete(tokens)
+}
+
 
 Lexer :: struct {
 	source: string,
@@ -35,16 +46,19 @@ Lexer :: struct {
 }
 
 skip :: proc(lex: ^Lexer) -> rune {
-	lex.cursor += 1
-	lex.column += 1
+	advance(lex)
 	return get_current_char(lex^)
 }
 
 next :: proc(lex: ^Lexer) -> rune {
 	append(&lex.buffer, get_current_char(lex^))
+	advance(lex)
+	return get_current_char(lex^)
+}
+
+advance :: proc(lex: ^Lexer) {
 	lex.cursor += 1
 	lex.column += 1
-	return get_current_char(lex^)
 }
 
 get_current_char :: proc(lex: Lexer) -> rune {
@@ -90,15 +104,11 @@ Error :: union {
 
 
 tokenize :: proc(lex: ^Lexer) -> ([]Token, Error) {
-	tokens: [dynamic]Token
+	tokens := make([dynamic]Token)
 
 	for get_current_char(lex^) != utf8.RUNE_EOF {
-		log.infof("@[%d,%d]: %v", lex.line, lex.column, get_current_char(lex^))
 		skip_whitespace(lex)
 		tok, err := next_token(lex)
-
-		log.infof("Got token: %v", tok)
-
 
 		if err != nil {
 			return nil, err
@@ -109,6 +119,7 @@ tokenize :: proc(lex: ^Lexer) -> ([]Token, Error) {
 
 	return tokens[:], nil
 }
+
 
 skip_whitespace :: proc(lex: ^Lexer) {
 	char := get_current_char(lex^)
@@ -139,6 +150,7 @@ next_token :: proc(lex: ^Lexer) -> (Token, Error) {
 	if is_digit(char) {
 		tok := parse_digit(lex)
 		if !expect_any(lex, '\r', '\n', ' ', '\t', '(', ')') {
+			delete(tok.value)
 			return Token{}, Syntax_Error{"unexpected char", lex.line, lex.column}
 		}
 		return tok, nil
