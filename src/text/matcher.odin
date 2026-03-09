@@ -9,7 +9,7 @@ is_alphabet :: proc(r: rune) -> bool {
 }
 
 is_valid_symbol :: proc(r: rune) -> bool {
-	for sym in "_-+=><?!" {
+	for sym in "_-+*/=><?!" {
 		if sym == r {return true}
 	}
 	return false

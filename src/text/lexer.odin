@@ -1,8 +1,10 @@
 package text
 
+import "core:log"
 import "core:unicode/utf8"
 
 TType :: enum {
+	None,
 	Left_Paren,
 	Right_Paren,
 	Identifier,
@@ -10,6 +12,7 @@ TType :: enum {
 }
 
 TType_String :: #sparse[TType]string {
+	.None        = "None",
 	.Left_Paren  = "Left_Paren",
 	.Right_Paren = "Right_Paren",
 	.Identifier  = "Identifier",
@@ -26,16 +29,21 @@ Lexer :: struct {
 	source: string,
 	buffer: [dynamic]rune,
 	cursor: uint,
+	// for error info
+	line:   uint,
+	column: uint,
 }
 
 skip :: proc(lex: ^Lexer) -> rune {
 	lex.cursor += 1
+	lex.column += 1
 	return get_current_char(lex^)
 }
 
 next :: proc(lex: ^Lexer) -> rune {
 	append(&lex.buffer, get_current_char(lex^))
 	lex.cursor += 1
+	lex.column += 1
 	return get_current_char(lex^)
 }
 
@@ -50,10 +58,16 @@ consume :: proc(lex: ^Lexer, ttype: TType) -> Token {
 }
 
 string_lexer :: proc(source_code: string) -> Lexer {
-	return Lexer{source = source_code, buffer = make([dynamic]rune, 0), cursor = 0}
+	return Lexer {
+		source = source_code,
+		buffer = make([dynamic]rune, 0),
+		cursor = 0,
+		line = 1,
+		column = 1,
+	}
 }
 
-expect :: proc(lex: ^Lexer, expected_chars: ..rune) -> bool {
+expect_any :: proc(lex: ^Lexer, expected_chars: ..rune) -> bool {
 	r := get_current_char(lex^)
 	for char in expected_chars {
 		if r == char {
@@ -65,9 +79,9 @@ expect :: proc(lex: ^Lexer, expected_chars: ..rune) -> bool {
 }
 
 Syntax_Error :: struct {
-	reason:   string,
-	// TODO: make this into (col, row) when file lexer is implemented
-	position: uint,
+	reason: string,
+	line:   uint,
+	col:    uint,
 }
 
 Error :: union {
@@ -79,8 +93,12 @@ tokenize :: proc(lex: ^Lexer) -> ([]Token, Error) {
 	tokens: [dynamic]Token
 
 	for get_current_char(lex^) != utf8.RUNE_EOF {
+		log.infof("@[%d,%d]: %v", lex.line, lex.column, get_current_char(lex^))
 		skip_whitespace(lex)
 		tok, err := next_token(lex)
+
+		log.infof("Got token: %v", tok)
+
 
 		if err != nil {
 			return nil, err
@@ -95,9 +113,16 @@ tokenize :: proc(lex: ^Lexer) -> ([]Token, Error) {
 skip_whitespace :: proc(lex: ^Lexer) {
 	char := get_current_char(lex^)
 	for char != utf8.RUNE_EOF {
-		if char == ' ' || char == '\n' || char == '\r' {
+		if char == ' ' || char == '\t' {
 			char = skip(lex)
 		}
+
+		if char == '\n' || char == '\r' {
+			char = skip(lex)
+			lex.line += 1
+			lex.column = 0
+		}
+
 		return
 	}
 }
@@ -113,8 +138,8 @@ next_token :: proc(lex: ^Lexer) -> (Token, Error) {
 
 	if is_digit(char) {
 		tok := parse_digit(lex)
-		if !expect(lex, ' ', '(', ')') {
-			return Token{}, Syntax_Error{"unexpected char", lex.cursor}
+		if !expect_any(lex, '\r', '\n', ' ', '\t', '(', ')') {
+			return Token{}, Syntax_Error{"unexpected char", lex.line, lex.column}
 		}
 		return tok, nil
 	}
