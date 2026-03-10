@@ -4,7 +4,7 @@ run:
 	odin run src $(COLL_FLAGS) -out:build/main
 
 check:
-	odin check src $(COLL_FLAGS)
+	odin check src $(COLL_FLAGS) -vet
 
 test:
 	odin test tests $(COLL_FLAGS)

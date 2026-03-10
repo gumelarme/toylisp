@@ -1,6 +1,8 @@
 package text
 
-import "core:log"
+import "core:fmt"
+import "core:os"
+import "core:strings"
 import "core:unicode/utf8"
 
 TType :: enum {
@@ -20,8 +22,10 @@ TType_String :: #sparse[TType]string {
 }
 
 Token :: struct {
-	type:  TType,
-	value: string,
+	type:   TType,
+	value:  string,
+	line:   uint,
+	column: uint,
 }
 
 delete_token :: proc(tok: Token) {
@@ -33,6 +37,14 @@ delete_tokens :: proc(tokens: []Token) {
 		delete_token(tok)
 	}
 	delete(tokens)
+}
+
+token_to_string :: proc(tok: Token) -> string {
+	if tok.type == .Number || tok.type == .Identifier {
+		return fmt.tprintf("<%d:%d %v '%s'>", tok.line, tok.column, tok.type, tok.value)
+	} else {
+		return fmt.tprintf("<%d:%d %v>", tok.line, tok.column, tok.type)
+	}
 }
 
 
@@ -68,12 +80,24 @@ get_current_char :: proc(lex: Lexer) -> rune {
 
 consume :: proc(lex: ^Lexer, ttype: TType) -> Token {
 	defer clear(&lex.buffer)
-	return Token{ttype, utf8.runes_to_string(lex.buffer[:])}
+
+	col := lex.column - 1 // move back after advanced
+	if length := len(lex.buffer); length > 1 {
+		// point to the start of the id
+		col -= uint(length - 1)
+	}
+
+	return Token{ttype, utf8.runes_to_string(lex.buffer[:]), lex.line, col}
 }
 
-string_lexer :: proc(source_code: string) -> Lexer {
+from_file :: proc(filename: string) -> (lex: Lexer, err: os.Error) {
+	data := os.read_entire_file_from_filename_or_err(filename) or_return
+	return from_string(string(data)), nil
+}
+
+from_string :: proc(source_code: string) -> Lexer {
 	return Lexer {
-		source = source_code,
+		source = strings.trim_space(source_code),
 		buffer = make([dynamic]rune, 0),
 		cursor = 0,
 		line = 1,
@@ -117,21 +141,24 @@ tokenize :: proc(lex: ^Lexer) -> ([]Token, Error) {
 		append(&tokens, tok)
 	}
 
+	// move back one char after EOF
+	lex.column -= 1
 	return tokens[:], nil
 }
-
 
 skip_whitespace :: proc(lex: ^Lexer) {
 	char := get_current_char(lex^)
 	for char != utf8.RUNE_EOF {
 		if char == ' ' || char == '\t' {
 			char = skip(lex)
+			continue
 		}
 
 		if char == '\n' || char == '\r' {
 			char = skip(lex)
 			lex.line += 1
-			lex.column = 0
+			lex.column = 1
+			continue
 		}
 
 		return

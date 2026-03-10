@@ -1,6 +1,7 @@
 package test
 
 import "core:fmt"
+import "core:log"
 import "core:strings"
 import "core:testing"
 import "src:text"
@@ -28,7 +29,7 @@ compare_tokens :: proc(a, b: []text.Token) -> (bool, []string) {
 
 @(test)
 test_lexer_number :: proc(t: ^testing.T) {
-	source := text.string_lexer("123a")
+	source := text.from_string("123a")
 	defer delete(source.buffer)
 
 	tokens, err := text.tokenize(&source)
@@ -42,7 +43,7 @@ test_lexer_number :: proc(t: ^testing.T) {
 
 @(test)
 test_lexer_simple :: proc(t: ^testing.T) {
-	source := text.string_lexer("(+ 1 2)")
+	source := text.from_string("(+ 1 2)")
 	defer delete(source.buffer)
 
 	tokens, err := text.tokenize(&source)
@@ -51,11 +52,11 @@ test_lexer_simple :: proc(t: ^testing.T) {
 	testing.expect(t, err == nil, "should not return error")
 
 	expected := []text.Token {
-		{.Left_Paren, "("},
-		{.Identifier, "+"},
-		{.Number, "1"},
-		{.Number, "2"},
-		{.Right_Paren, ")"},
+		{.Left_Paren, "(", 1, 1},
+		{.Identifier, "+", 1, 2},
+		{.Number, "1", 1, 4},
+		{.Number, "2", 1, 6},
+		{.Right_Paren, ")", 1, 7},
 	}
 
 	is_ok, reasons := compare_tokens(expected, tokens)
@@ -67,7 +68,7 @@ test_multiline_string :: proc(t: ^testing.T) {
 	source_code := strings.join({"(+ 888", "(* 12 3))"}, "\n")
 	defer delete(source_code)
 
-	source := text.string_lexer(source_code)
+	source := text.from_string(source_code)
 	defer delete(source.buffer)
 
 	tokens, err := text.tokenize(&source)
@@ -78,17 +79,32 @@ test_multiline_string :: proc(t: ^testing.T) {
 	testing.expect_value(t, source.column, 9)
 
 	expected := []text.Token {
-		{.Left_Paren, "("},
-		{.Identifier, "+"},
-		{.Number, "888"},
-		{.Left_Paren, "("},
-		{.Identifier, "*"},
-		{.Number, "12"},
-		{.Number, "3"},
-		{.Right_Paren, ")"},
-		{.Right_Paren, ")"},
+		{.Left_Paren, "(", 1, 1},
+		{.Identifier, "+", 1, 2},
+		{.Number, "888", 1, 4},
+		{.Left_Paren, "(", 2, 1},
+		{.Identifier, "*", 2, 2},
+		{.Number, "12", 2, 4},
+		{.Number, "3", 2, 7},
+		{.Right_Paren, ")", 2, 8},
+		{.Right_Paren, ")", 2, 9},
 	}
 
 	is_ok, reasons := compare_tokens(expected, tokens)
 	testing.expect(t, is_ok, strings.join(reasons, "\n"))
+}
+
+@(test)
+test_lexer_from_file :: proc(t: ^testing.T) {
+	source, _ := text.from_file("./resources/fib.cl")
+	defer {
+		delete(source.source)
+		delete(source.buffer)
+	}
+
+	tokens, err := text.tokenize(&source)
+	defer text.delete_tokens(tokens)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, source.line, 6)
+	testing.expect_value(t, source.column, 7)
 }
