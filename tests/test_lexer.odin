@@ -108,3 +108,55 @@ test_lexer_from_file :: proc(t: ^testing.T) {
 	testing.expect_value(t, source.line, 6)
 	testing.expect_value(t, source.column, 7)
 }
+
+@(test)
+test_parse_bool :: proc(t: ^testing.T) {
+	source := text.from_string("(= true false)")
+	defer delete(source.buffer)
+
+	tokens, err := text.tokenize(&source)
+	defer text.delete_tokens(tokens)
+
+	expected := []text.Token {
+		{.Left_Paren, "(", 1, 1},
+		{.Identifier, "=", 1, 2},
+		{.Bool, "true", 1, 4},
+		{.Bool, "false", 1, 9},
+		{.Right_Paren, ")", 1, 14},
+	}
+
+	is_ok, reasons := compare_tokens(expected, tokens)
+	testing.expect(t, is_ok, strings.join(reasons, "\n"))
+
+}
+
+@(test)
+test_parse_keyword :: proc(t: ^testing.T) {
+
+	source_code := strings.join({"(def x 1)", "(defn a ())"}, "\n")
+	source := text.from_string(source_code)
+	defer delete(source.buffer)
+
+	tokens, err := text.tokenize(&source)
+	defer text.delete_tokens(tokens)
+
+	expected := []text.Token {
+		// First line
+		{.Left_Paren, "(", 1, 1},
+		{.Keyword, "def", 1, 2},
+		{.Identifier, "x", 1, 6},
+		{.Number, "1", 1, 8},
+		{.Right_Paren, ")", 1, 9},
+
+		// Second line
+		{.Left_Paren, "(", 2, 1},
+		{.Keyword, "defn", 2, 2},
+		{.Identifier, "a", 2, 7},
+		{.Left_Paren, "(", 2, 9},
+		{.Right_Paren, ")", 2, 10},
+		{.Right_Paren, ")", 2, 11},
+	}
+
+	is_ok, reasons := compare_tokens(expected, tokens)
+	testing.expect(t, is_ok, strings.join(reasons, "\n"))
+}

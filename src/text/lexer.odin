@@ -11,14 +11,9 @@ TType :: enum {
 	Right_Paren,
 	Identifier,
 	Number,
-}
-
-TType_String :: #sparse[TType]string {
-	.None        = "None",
-	.Left_Paren  = "Left_Paren",
-	.Right_Paren = "Right_Paren",
-	.Identifier  = "Identifier",
-	.Number      = "Number",
+	Bool,
+	// we dont have macros here, so def & defn is a keyword
+	Keyword,
 }
 
 Token :: struct {
@@ -214,5 +209,12 @@ parse_identifier :: proc(lex: ^Lexer) -> Token {
 		break
 	}
 
-	return consume(lex, .Identifier)
+	tok := consume(lex, .Identifier)
+	switch tok.value {
+	case "true", "false":
+		tok.type = .Bool
+	case "def", "defn":
+		tok.type = .Keyword
+	}
+	return tok
 }
