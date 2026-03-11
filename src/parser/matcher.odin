@@ -1,4 +1,4 @@
-package text
+package parser
 
 is_digit :: proc(r: rune) -> bool {
 	return r >= '0' && r <= '9'

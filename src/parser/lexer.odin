@@ -1,16 +1,27 @@
-package text
+package parser
 
 import "core:fmt"
 import "core:os"
 import "core:strings"
 import "core:unicode/utf8"
 
+Syntax_Error :: struct {
+	reason: string,
+	line:   uint,
+	col:    uint,
+}
+
+Error :: union {
+	Syntax_Error,
+}
+
+
 TType :: enum {
 	None,
 	Left_Paren,
 	Right_Paren,
 	Identifier,
-	Number,
+	Int,
 	Bool,
 	// we dont have macros here, so def & defn is a keyword
 	Keyword,
@@ -35,7 +46,7 @@ delete_tokens :: proc(tokens: []Token) {
 }
 
 token_to_string :: proc(tok: Token) -> string {
-	if tok.type == .Number || tok.type == .Identifier {
+	if tok.type == .Int || tok.type == .Identifier {
 		return fmt.tprintf("<%d:%d %v '%s'>", tok.line, tok.column, tok.type, tok.value)
 	} else {
 		return fmt.tprintf("<%d:%d %v>", tok.line, tok.column, tok.type)
@@ -85,12 +96,12 @@ consume :: proc(lex: ^Lexer, ttype: TType) -> Token {
 	return Token{ttype, utf8.runes_to_string(lex.buffer[:]), lex.line, col}
 }
 
-from_file :: proc(filename: string) -> (lex: Lexer, err: os.Error) {
+lexer_from_file :: proc(filename: string) -> (lex: Lexer, err: os.Error) {
 	data := os.read_entire_file_from_filename_or_err(filename) or_return
-	return from_string(string(data)), nil
+	return lexer_from_string(string(data)), nil
 }
 
-from_string :: proc(source_code: string) -> Lexer {
+lexer_from_string :: proc(source_code: string) -> Lexer {
 	return Lexer {
 		source = strings.trim_space(source_code),
 		buffer = make([dynamic]rune, 0),
@@ -109,16 +120,6 @@ expect_any :: proc(lex: ^Lexer, expected_chars: ..rune) -> bool {
 	}
 
 	return false
-}
-
-Syntax_Error :: struct {
-	reason: string,
-	line:   uint,
-	col:    uint,
-}
-
-Error :: union {
-	Syntax_Error,
 }
 
 
@@ -170,22 +171,22 @@ next_token :: proc(lex: ^Lexer) -> (Token, Error) {
 	}
 
 	if is_digit(char) {
-		tok := parse_digit(lex)
+		tok := lex_digit(lex)
 		if !expect_any(lex, '\r', '\n', ' ', '\t', '(', ')') {
 			delete(tok.value)
-			return Token{}, Syntax_Error{"unexpected char", lex.line, lex.column}
+			return Token{}, unexpected_token(tok)
 		}
 		return tok, nil
 	}
 
 	if is_alphabet(char) || is_valid_symbol(char) {
-		return parse_identifier(lex), nil
+		return lex_identifier(lex), nil
 	}
 
 	return Token{}, nil
 }
 
-parse_digit :: proc(lex: ^Lexer) -> Token {
+lex_digit :: proc(lex: ^Lexer) -> Token {
 	char := next(lex)
 	for char != utf8.RUNE_EOF {
 		if is_digit(char) {
@@ -195,10 +196,10 @@ parse_digit :: proc(lex: ^Lexer) -> Token {
 		break
 	}
 
-	return consume(lex, .Number)
+	return consume(lex, .Int)
 }
 
-parse_identifier :: proc(lex: ^Lexer) -> Token {
+lex_identifier :: proc(lex: ^Lexer) -> Token {
 	char := next(lex)
 	for char != utf8.RUNE_EOF {
 		if is_alphabet(char) || is_valid_symbol(char) || is_digit(char) {
@@ -217,4 +218,12 @@ parse_identifier :: proc(lex: ^Lexer) -> Token {
 		tok.type = .Keyword
 	}
 	return tok
+}
+
+unexpected_token :: proc(tok: Token) -> Syntax_Error {
+	return syntax_errorf(tok, "unexpected `%s`", tok.value)
+}
+
+syntax_errorf :: proc(tok: Token, format: string, values: ..any) -> Syntax_Error {
+	return Syntax_Error{reason = fmt.tprintf(format, values), line = tok.line, col = tok.column}
 }

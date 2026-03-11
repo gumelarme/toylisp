@@ -1,11 +1,11 @@
 package main
 
 import "core:fmt"
-import "src:text"
+import "src:parser"
 
 main :: proc() {
-	code := text.from_string("(- 1000 (add-123 120 123))")
-	tokens, err := text.tokenize(&code)
+	code := parser.lexer_from_string("(- 1000 (add-123 120 123))")
+	tokens, err := parser.tokenize(&code)
 	if err != nil {
 		panic(fmt.tprintf("Syntax error: %v", err))
 	}

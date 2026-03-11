@@ -1,9 +1,8 @@
-package text
+package parser
 
-import "core:fmt"
 import "core:strconv"
 
-Number :: distinct int
+Int :: distinct int
 Bool :: distinct bool
 
 Function_Call :: struct {
@@ -13,7 +12,7 @@ Function_Call :: struct {
 
 
 Expr :: union {
-	Number,
+	Int,
 	Bool,
 	Function_Call,
 }
@@ -27,7 +26,7 @@ Function :: struct {
 Definition :: struct {
 	name:  string,
 	value: union {
-		Number,
+		Int,
 		Bool,
 		Function,
 	},
@@ -59,7 +58,7 @@ parse :: proc {
 }
 
 parse_string :: proc(code: string) -> (ast: AST, err: Error) {
-	lexer := from_string(code)
+	lexer := lexer_from_string(code)
 	defer delete(lexer.buffer)
 
 	tokens := tokenize(&lexer) or_return
@@ -86,7 +85,7 @@ parse_tokens :: proc(tokens: []Token) -> (ast: AST, err: Error) {
 		tok := p.tokens[p.cursor]
 
 		#partial switch tok.type {
-		case .Bool, .Number:
+		case .Bool, .Int:
 			lit := parse_literal(&p) or_return
 			append(&exprs, lit)
 		case .Left_Paren:
@@ -99,6 +98,27 @@ parse_tokens :: proc(tokens: []Token) -> (ast: AST, err: Error) {
 	return AST{exprs = exprs[:]}, nil
 }
 
+parse_expression :: proc(p: ^Parser) -> (expr: Expr, err: Error) {
+	tok := p.tokens[p.cursor]
+	#partial switch tok.type {
+	case .Bool, .Int:
+		return parse_literal(p)
+	case .Left_Paren:
+		func := parse_function_call(p) or_return
+
+		tok = p.tokens[p.cursor]
+		if tok.type != .Right_Paren {
+			return Expr{}, syntax_errorf(tok, "missing closing paren")
+		}
+
+		p.cursor += 1
+		return func, nil
+	}
+
+	return Expr{}, unexpected_token(tok)
+}
+
+
 parse_literal :: proc(p: ^Parser) -> (expr: Expr, err: Error) {
 	tok := p.tokens[p.cursor]
 	p.cursor += 1
@@ -108,34 +128,12 @@ parse_literal :: proc(p: ^Parser) -> (expr: Expr, err: Error) {
 		return Bool(res), nil
 	}
 
-	if tok.type == .Number {
+	if tok.type == .Int {
 		res, _ := strconv.parse_int(tok.value)
-		return Number(res), nil
+		return Int(res), nil
 	}
 
-	reason := fmt.tprintf("unexpected token `%v`", tok.value)
-	return Expr{}, Syntax_Error{reason, tok.line, tok.column}
-}
-
-parse_expression :: proc(p: ^Parser) -> (expr: Expr, err: Error) {
-	tok := p.tokens[p.cursor]
-	#partial switch tok.type {
-	case .Bool, .Number:
-		return parse_literal(p)
-	case .Left_Paren:
-		func := parse_function_call(p) or_return
-
-		tok = p.tokens[p.cursor]
-		if tok.type != .Right_Paren {
-			return Expr{}, Syntax_Error{"missing closing paren", tok.line, tok.column}
-		}
-
-		p.cursor += 1
-		return func, nil
-	}
-
-	reason := fmt.tprintf("unexpected token `%v`", tok.value)
-	return Expr{}, Syntax_Error{reason, tok.line, tok.column}
+	return Expr{}, unexpected_token(tok)
 }
 
 
@@ -169,8 +167,8 @@ is_expression_equal :: proc(a, b: Expr) -> bool {
 	switch _ in a {
 	case Function_Call:
 		return is_function_call_equal(a.(Function_Call), b.(Function_Call))
-	case Number:
-		return a.(Number) == b.(Number)
+	case Int:
+		return a.(Int) == b.(Int)
 	case Bool:
 		return a.(Bool) == b.(Bool)
 	}
