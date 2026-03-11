@@ -1,7 +1,6 @@
 package test
 
 import "core:fmt"
-import "core:log"
 import "core:strings"
 import "core:testing"
 import "src:text"
@@ -132,12 +131,13 @@ test_parse_bool :: proc(t: ^testing.T) {
 
 @(test)
 test_parse_keyword :: proc(t: ^testing.T) {
-
 	source_code := strings.join({"(def x 1)", "(defn a ())"}, "\n")
-	source := text.from_string(source_code)
-	defer delete(source.buffer)
+	defer delete(source_code)
 
-	tokens, err := text.tokenize(&source)
+	lexer := text.from_string(source_code)
+	defer delete(lexer.buffer)
+
+	tokens, err := text.tokenize(&lexer)
 	defer text.delete_tokens(tokens)
 
 	expected := []text.Token {
