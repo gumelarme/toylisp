@@ -7,6 +7,7 @@ import "src:parser"
 Error :: union {
 	InsufficientStack,
 	TypeMismatch,
+	IncorrectArity,
 }
 
 InsufficientStack :: struct {
@@ -17,6 +18,11 @@ InsufficientStack :: struct {
 TypeMismatch :: struct {
 	expected: typeid,
 	got:      typeid,
+}
+
+IncorrectArity :: struct {
+	expected: int,
+	got:      int,
 }
 
 Primitives :: union {
@@ -144,6 +150,12 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 	}
 
 
+	param_count, args_count := len(params), len(fn_call.args)
+	if param_count > args_count {
+		return nil, IncorrectArity{param_count, args_count}
+	}
+
+
 	// Put argument into the scope
 	arg_pos := 0
 	for name, kind in params {
@@ -155,7 +167,7 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 		}
 
 		//VarArgs
-		var_arg_count := len(fn_call.args) - len(params) + 1
+		var_arg_count := args_count - param_count + 1
 		var_args := make([]Primitives, var_arg_count)
 
 		for offset in 0 ..< var_arg_count {
@@ -165,7 +177,6 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 
 		new_scope.defs[name] = var_args
 		rt.scope = new_scope
-
 	}
 
 	// Invoke the function!

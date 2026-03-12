@@ -5,7 +5,11 @@ package rt
 import "src:parser"
 
 reducer :: proc($T: typeid, args: []T, fn: proc(a, b: T) -> T, init: T) -> T {
-	res := T(init) if len(args) < 2 else args[0]
+	if len(args) < 2 {
+		return fn(T(init), args[0])
+	}
+
+	res := args[0]
 	for arg in args[1:] {
 		res = fn(res, arg)
 	}
