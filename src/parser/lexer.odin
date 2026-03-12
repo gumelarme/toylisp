@@ -6,13 +6,15 @@ import "core:strings"
 import "core:unicode/utf8"
 
 Syntax_Error :: struct {
-	reason: string,
-	line:   uint,
-	col:    uint,
+	line: uint,
+	col:  uint,
 }
+
+Missing_Paren :: distinct Syntax_Error
 
 Error :: union {
 	Syntax_Error,
+	Missing_Paren,
 }
 
 
@@ -131,6 +133,12 @@ tokenize :: proc(lex: ^Lexer) -> ([]Token, Error) {
 		tok, err := next_token(lex)
 
 		if err != nil {
+			defer {
+				for t in tokens {
+					delete_token(t)
+				}
+				delete(tokens)
+			}
 			return nil, err
 		}
 
@@ -172,8 +180,9 @@ next_token :: proc(lex: ^Lexer) -> (Token, Error) {
 
 	if is_digit(char) {
 		tok := lex_digit(lex)
-		if !expect_any(lex, '\r', '\n', ' ', '\t', '(', ')') {
-			delete(tok.value)
+		// EOF to propagate the handling of `missing paren` error to parser
+		if !expect_any(lex, '\r', '\n', ' ', '\t', '(', ')', utf8.RUNE_EOF) {
+			defer delete_token(tok)
 			return Token{}, unexpected_token(tok)
 		}
 		return tok, nil
@@ -221,9 +230,13 @@ lex_identifier :: proc(lex: ^Lexer) -> Token {
 }
 
 unexpected_token :: proc(tok: Token) -> Syntax_Error {
-	return syntax_errorf(tok, "unexpected `%s`", tok.value)
+	return Syntax_Error{tok.line, tok.column}
 }
 
-syntax_errorf :: proc(tok: Token, format: string, values: ..any) -> Syntax_Error {
-	return Syntax_Error{reason = fmt.tprintf(format, values), line = tok.line, col = tok.column}
-}
+// syntax_errorf :: proc(tok: Token, format: string, values: ..any) -> Syntax_Error {
+// 	return Syntax_Error{reason = fmt.tprintf(format, values), line = tok.line, col = tok.column}
+// }
+
+// syntax_error :: proc(tok: Token, reason: string) -> Syntax_Error {
+// 	return Syntax_Error{reason = strings.clone(reason), line = tok.line, col = tok.column}
+// }

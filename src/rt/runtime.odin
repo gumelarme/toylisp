@@ -2,7 +2,6 @@
 
 package rt
 
-import "core:log"
 import "src:parser"
 
 Error :: union {

@@ -3,6 +3,8 @@ package test
 import "core:testing"
 import "src:parser"
 
+// TODO: test for every possible error to check for leak
+
 @(test)
 test_parser_function_call_simple :: proc(t: ^testing.T) {
 	ast, err := parser.parse("(+ 1 2 3)")

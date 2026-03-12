@@ -68,11 +68,16 @@ parse_string :: proc(code: string) -> (ast: AST, err: Error) {
 	defer delete(lexer.buffer)
 
 	tokens := tokenize(&lexer) or_return
+	defer if err == nil {
+		// FIXME: handle on error cleanup
+		// if error happens keep tokens for error reporting
+		// but the user needed to release the tokens somehow
+		delete_tokens(tokens)
+	}
 	return parse_tokens(tokens)
 }
 
 parse_tokens :: proc(tokens: []Token) -> (ast: AST, err: Error) {
-	defer delete_tokens(tokens)
 	p := Parser {
 		tokens = tokens,
 		cursor = 0,
@@ -111,10 +116,17 @@ parse_expression :: proc(p: ^Parser) -> (expr: Expr, err: Error) {
 		return parse_literal(p)
 	case .Left_Paren:
 		func := parse_function_call(p) or_return
+		has_token := len(p.tokens) > p.cursor
+
+		last_token := p.tokens[len(p.tokens) - 1]
+		missing_paren := Missing_Paren{last_token.line, last_token.column}
+		if !has_token {
+			return Expr{}, missing_paren
+		}
 
 		tok = p.tokens[p.cursor]
 		if tok.type != .Right_Paren {
-			return Expr{}, syntax_errorf(tok, "missing closing paren")
+			return Expr{}, missing_paren
 		}
 
 		p.cursor += 1
@@ -139,6 +151,7 @@ parse_literal :: proc(p: ^Parser) -> (expr: Expr, err: Error) {
 		return Int(res), nil
 	}
 
+	tok.value = "BAR"
 	return Expr{}, unexpected_token(tok)
 }
 
