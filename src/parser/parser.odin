@@ -17,8 +17,13 @@ Expr :: union {
 	Function_Call,
 }
 
+Arg :: enum {
+	PosArg,
+	VarArg,
+}
+
 Function :: struct {
-	args: []string,
+	args: map[string]Arg,
 	body: Expr,
 }
 
