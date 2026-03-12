@@ -2,6 +2,7 @@
 
 package rt
 
+import "core:log"
 import "src:parser"
 
 Error :: union {
@@ -97,7 +98,6 @@ peek_stack :: proc(stack: Stack) -> (Primitives, bool) {
 	if expect_stack_size(stack, 1) != nil {
 		return nil, false
 	}
-
 	return stack[len(stack) - 1], true
 }
 

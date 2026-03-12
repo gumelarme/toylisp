@@ -1,6 +1,7 @@
 package parser
 
 import "core:strconv"
+import "core:strings"
 
 Int :: distinct int
 Bool :: distinct bool
@@ -159,7 +160,7 @@ parse_function_call :: proc(p: ^Parser) -> (fn: Function_Call, err: Error) {
 		append(&args, expr)
 	}
 
-	return Function_Call{id, args[:]}, nil
+	return Function_Call{strings.clone(id), args[:]}, nil
 }
 
 //-- Tree node equality check function
@@ -207,6 +208,7 @@ delete_expression :: proc(expr: Expr) {
 		for arg in func.args {
 			delete_expression(arg)
 		}
+		delete(func.name)
 		delete(func.args)
 	}
 }

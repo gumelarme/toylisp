@@ -1,7 +1,8 @@
 COLL_FLAGS=-collection:src=src
 
 run:
-	odin run src $(COLL_FLAGS) -out:build/main
+	odin run src $(COLL_FLAGS) -out:build/main 
+# -sanitize:address
 
 check:
 	odin check src $(COLL_FLAGS) -vet
