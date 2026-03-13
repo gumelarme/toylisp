@@ -2,6 +2,7 @@
 
 package rt
 
+import "core:reflect"
 import "src:parser"
 
 reducer :: proc($T: typeid, args: []T, fn: proc(a, b: T) -> T, init: T) -> T {
@@ -36,15 +37,16 @@ var_args_collector :: proc(
 		case W:
 			args[i] = B(arg.(W))
 		case:
-			return nil, TypeMismatch{W, type_of(type_)}
+			arg_type := reflect.union_variant_typeid(arg)
+			return nil, Type_Mismatch{W, arg_type}
 		}
 	}
 
 	return args, nil
 }
 
-add_builtin :: proc() -> BuiltinFunction {
-	return BuiltinFunction {
+add_builtin :: proc() -> Builtin_Function {
+	return Builtin_Function {
 		args = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Int, int) or_return
@@ -57,8 +59,8 @@ add_builtin :: proc() -> BuiltinFunction {
 	}
 }
 
-subtract_builtin :: proc() -> BuiltinFunction {
-	return BuiltinFunction {
+subtract_builtin :: proc() -> Builtin_Function {
+	return Builtin_Function {
 		args = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Int, int) or_return
@@ -71,8 +73,8 @@ subtract_builtin :: proc() -> BuiltinFunction {
 	}
 }
 
-multiply_builtin :: proc() -> BuiltinFunction {
-	return BuiltinFunction {
+multiply_builtin :: proc() -> Builtin_Function {
+	return Builtin_Function {
 		args = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Int, int) or_return
@@ -85,8 +87,8 @@ multiply_builtin :: proc() -> BuiltinFunction {
 	}
 }
 
-division_builtin :: proc() -> BuiltinFunction {
-	return BuiltinFunction {
+division_builtin :: proc() -> Builtin_Function {
+	return Builtin_Function {
 		args = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Int, int) or_return
@@ -101,8 +103,8 @@ division_builtin :: proc() -> BuiltinFunction {
 
 // -- Bool builtin functions
 
-and_builtin :: proc() -> BuiltinFunction {
-	return BuiltinFunction {
+and_builtin :: proc() -> Builtin_Function {
+	return Builtin_Function {
 		args = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Bool, bool) or_return
@@ -115,8 +117,8 @@ and_builtin :: proc() -> BuiltinFunction {
 	}
 }
 
-or_builtin :: proc() -> BuiltinFunction {
-	return BuiltinFunction {
+or_builtin :: proc() -> Builtin_Function {
+	return Builtin_Function {
 		args = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Bool, bool) or_return
@@ -129,13 +131,32 @@ or_builtin :: proc() -> BuiltinFunction {
 	}
 }
 
-not_builtin :: proc() -> BuiltinFunction {
-	return BuiltinFunction {
+not_builtin :: proc() -> Builtin_Function {
+	return Builtin_Function {
 		args = {"pred" = .PosArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			arg := scope.defs["pred"].(Primitives)
 
 			result := !bool(arg.(parser.Bool))
+			return Primitives(parser.Bool(result)), nil
+		},
+	}
+}
+
+equal_builtin :: proc() -> Builtin_Function {
+	return Builtin_Function {
+		args = {"a" = .PosArg, "b" = .PosArg},
+		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
+			a := scope.defs["a"].(Primitives)
+			b := scope.defs["b"].(Primitives)
+
+			type_a := reflect.union_variant_typeid(a)
+			type_b := reflect.union_variant_typeid(b)
+			if type_a != type_b {
+				return nil, Type_Mismatch{type_a, type_b}
+			}
+
+			result := a == b
 			return Primitives(parser.Bool(result)), nil
 		},
 	}

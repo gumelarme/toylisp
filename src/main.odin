@@ -58,7 +58,7 @@ eval :: proc(vm: ^rt.Runtime, code: string) -> (result: rt.Primitives, err: Erro
 	val, has_value := rt.peek_stack(vm.stack)
 
 	if !has_value {
-		return nil, rt.Error(rt.InsufficientStack{1, 0})
+		return nil, rt.Error(rt.Insufficient_Stack{1, 0})
 	}
 	return val, nil
 }

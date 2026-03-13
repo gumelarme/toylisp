@@ -5,22 +5,22 @@ package rt
 import "src:parser"
 
 Error :: union {
-	InsufficientStack,
-	TypeMismatch,
-	IncorrectArity,
+	Insufficient_Stack,
+	Type_Mismatch,
+	Incorrect_Arity,
 }
 
-InsufficientStack :: struct {
+Insufficient_Stack :: struct {
 	expected: int,
 	got:      int,
 }
 
-TypeMismatch :: struct {
+Type_Mismatch :: struct {
 	expected: typeid,
 	got:      typeid,
 }
 
-IncorrectArity :: struct {
+Incorrect_Arity :: struct {
 	expected: int,
 	got:      int,
 }
@@ -55,15 +55,15 @@ delete_scope :: proc(scope: ^Scope) {
 	delete_map(scope.defs)
 }
 
-UserFunction :: parser.Function
-BuiltinFunction :: struct {
+User_Function :: parser.Function
+Builtin_Function :: struct {
 	args: map[string]parser.Arg,
 	body: proc(scope: Scope) -> (Primitives, Error),
 }
 
 Function :: union {
-	UserFunction,
-	BuiltinFunction,
+	User_Function,
+	Builtin_Function,
 }
 
 Runtime :: struct {
@@ -75,10 +75,10 @@ Runtime :: struct {
 delete_runtime :: proc(rt: ^Runtime) {
 	for _, fn in rt.defs {
 		switch _ in fn {
-		case UserFunction:
-			delete(fn.(UserFunction).args)
-		case BuiltinFunction:
-			delete(fn.(BuiltinFunction).args)
+		case User_Function:
+			delete(fn.(User_Function).args)
+		case Builtin_Function:
+			delete(fn.(Builtin_Function).args)
 		}
 	}
 
@@ -95,6 +95,7 @@ new :: proc() -> Runtime {
 			"-" = subtract_builtin(),
 			"*" = multiply_builtin(),
 			"/" = division_builtin(),
+			"=" = equal_builtin(),
 			"and" = and_builtin(),
 			"or" = or_builtin(),
 			"not" = not_builtin(),
@@ -140,16 +141,14 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 		parent = &rt.scope,
 	}
 
-	defer if err != nil {
-		delete_scope(&new_scope)
-	}
+	defer delete_scope(&new_scope)
 
 	params: map[string]parser.Arg
 	switch _ in fn_def {
-	case UserFunction:
+	case User_Function:
 		params = fn_def.(parser.Function).args
-	case BuiltinFunction:
-		params = fn_def.(BuiltinFunction).args
+	case Builtin_Function:
+		params = fn_def.(Builtin_Function).args
 	}
 
 	check_arity(params, fn_call.args) or_return
@@ -174,15 +173,14 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 		}
 
 		new_scope.defs[name] = var_args
-		rt.scope = new_scope
 	}
+
+	rt.scope = new_scope
 
 	// Invoke the function!
 	#partial switch _ in fn_def {
-	case BuiltinFunction:
-		defer delete_scope(&rt.scope) // cleanup args
-
-		fn := fn_def.(BuiltinFunction)
+	case Builtin_Function:
+		fn := fn_def.(Builtin_Function)
 		result := fn.body(rt.scope) or_return
 		rt.scope = rt.scope.parent^
 		return result, nil
@@ -204,7 +202,7 @@ check_arity :: proc(params: map[string]parser.Arg, args: []parser.Expr) -> Error
 		}
 	}
 
-	error := IncorrectArity{param_count, args_count}
+	error := Incorrect_Arity{param_count, args_count}
 	if var_param_count == 0 {
 		if param_count == args_count {
 			return nil
@@ -226,5 +224,5 @@ expect_stack_size :: proc(stack: Stack, count: int) -> Error {
 		return nil
 	}
 
-	return InsufficientStack{expected = count, got = stack_len}
+	return Insufficient_Stack{expected = count, got = stack_len}
 }
