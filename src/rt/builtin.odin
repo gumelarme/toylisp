@@ -98,3 +98,45 @@ division_builtin :: proc() -> BuiltinFunction {
 		},
 	}
 }
+
+// -- Bool builtin functions
+
+and_builtin :: proc() -> BuiltinFunction {
+	return BuiltinFunction {
+		args = {"values" = .VarArg},
+		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
+			args := var_args_collector(scope, parser.Bool, bool) or_return
+			defer delete(args)
+
+			fn := proc(a, b: bool) -> bool {return a && b}
+			result := reducer(bool, args, fn, true)
+			return Primitives(parser.Bool(result)), nil
+		},
+	}
+}
+
+or_builtin :: proc() -> BuiltinFunction {
+	return BuiltinFunction {
+		args = {"values" = .VarArg},
+		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
+			args := var_args_collector(scope, parser.Bool, bool) or_return
+			defer delete(args)
+
+			fn := proc(a, b: bool) -> bool {return a || b}
+			result := reducer(bool, args, fn, true)
+			return Primitives(parser.Bool(result)), nil
+		},
+	}
+}
+
+not_builtin :: proc() -> BuiltinFunction {
+	return BuiltinFunction {
+		args = {"pred" = .PosArg},
+		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
+			arg := scope.defs["pred"].(Primitives)
+
+			result := !bool(arg.(parser.Bool))
+			return Primitives(parser.Bool(result)), nil
+		},
+	}
+}

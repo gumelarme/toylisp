@@ -95,6 +95,9 @@ new :: proc() -> Runtime {
 			"-" = subtract_builtin(),
 			"*" = multiply_builtin(),
 			"/" = division_builtin(),
+			"and" = and_builtin(),
+			"or" = or_builtin(),
+			"not" = not_builtin(),
 		},
 	}
 }
@@ -150,6 +153,7 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 	}
 
 
+	// TODO : check if args > param_count when no var args
 	param_count, args_count := len(params), len(fn_call.args)
 	if param_count > args_count {
 		return nil, IncorrectArity{param_count, args_count}
