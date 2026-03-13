@@ -152,13 +152,7 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 		params = fn_def.(BuiltinFunction).args
 	}
 
-
-	// TODO : check if args > param_count when no var args
-	param_count, args_count := len(params), len(fn_call.args)
-	if param_count > args_count {
-		return nil, IncorrectArity{param_count, args_count}
-	}
-
+	check_arity(params, fn_call.args) or_return
 
 	// Put argument into the scope
 	arg_pos := 0
@@ -171,7 +165,7 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 		}
 
 		//VarArgs
-		var_arg_count := args_count - param_count + 1
+		var_arg_count := len(fn_call.args) - len(params) + 1
 		var_args := make([]Primitives, var_arg_count)
 
 		for offset in 0 ..< var_arg_count {
@@ -195,6 +189,35 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 	}
 
 	return nil, nil
+}
+
+check_arity :: proc(params: map[string]parser.Arg, args: []parser.Expr) -> Error {
+	param_count, args_count := len(params), len(args)
+	pos_param_count, var_param_count := 0, 0
+
+	for _, p in params {
+		switch p {
+		case .PosArg:
+			pos_param_count += 1
+		case .VarArg:
+			var_param_count += 1
+		}
+	}
+
+	error := IncorrectArity{param_count, args_count}
+	if var_param_count == 0 {
+		if param_count == args_count {
+			return nil
+		}
+
+		return error
+	}
+
+	left_over := args_count - pos_param_count
+	if left_over > 0 {
+		return nil
+	}
+	return error
 }
 
 expect_stack_size :: proc(stack: Stack, count: int) -> Error {
