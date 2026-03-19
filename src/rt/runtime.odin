@@ -8,6 +8,7 @@ Error :: union {
 	Insufficient_Stack,
 	Type_Mismatch,
 	Incorrect_Arity,
+	Undefined_Name,
 }
 
 Insufficient_Stack :: struct {
@@ -23,6 +24,10 @@ Type_Mismatch :: struct {
 Incorrect_Arity :: struct {
 	expected: int,
 	got:      int,
+}
+
+Undefined_Name :: struct {
+	name: string,
 }
 
 Primitives :: union {
@@ -135,7 +140,11 @@ eval_expr :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Er
 
 invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error) {
 	fn_call := expr.(parser.Function_Call)
-	fn_def := rt.defs[fn_call.name]
+	fn_def, ok := rt.defs[fn_call.name]
+
+	if !ok {
+		return nil, Undefined_Name{fn_call.name}
+	}
 
 	new_scope := Scope {
 		parent = &rt.scope,
