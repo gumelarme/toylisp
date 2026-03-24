@@ -25,6 +25,9 @@ main :: proc() {
 	stdin := os.stream_from_handle(os.stdin)
 	bufio.scanner_init(&scanner, stdin, context.temp_allocator)
 
+	// TODO: special commands with backslash to inspect runtime
+	// such as: \scope, \stack, \functions
+	// might also neeed to allow printing a variable values
 	fmt.println("Hello!")
 	for {
 		fmt.printf(">>> ")

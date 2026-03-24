@@ -2,6 +2,7 @@
 
 package rt
 
+import "core:fmt"
 import "src:parser"
 
 Error :: union {
@@ -9,6 +10,7 @@ Error :: union {
 	Type_Mismatch,
 	Incorrect_Arity,
 	Undefined_Name,
+	Already_Defined,
 }
 
 Insufficient_Stack :: struct {
@@ -30,6 +32,11 @@ Undefined_Name :: struct {
 	name: string,
 }
 
+Already_Defined :: struct {
+	name: string,
+	// location: u8
+}
+
 Primitives :: union {
 	parser.Int,
 	parser.Bool,
@@ -49,6 +56,7 @@ Scope :: struct {
 	defs:   map[string]Value,
 }
 
+
 delete_scope :: proc(scope: ^Scope) {
 	for _, v in scope.defs {
 		#partial switch _ in v {
@@ -58,6 +66,19 @@ delete_scope :: proc(scope: ^Scope) {
 	}
 
 	delete_map(scope.defs)
+}
+
+find_id :: proc(scope: Scope, name: string) -> (prim: Primitives, err: Error) {
+	value, found := scope.defs[name]
+	if found {
+		return value.(Primitives), nil
+	}
+
+	if scope.parent != nil {
+		return find_id(scope.parent^, name)
+	}
+
+	return nil, Undefined_Name{name}
 }
 
 User_Function :: parser.Function
@@ -88,11 +109,17 @@ delete_runtime :: proc(rt: ^Runtime) {
 	}
 
 	delete_map(rt.defs)
+	delete_scope(&rt.scope)
 	delete_dynamic_array(rt.stack)
 }
 
 new :: proc() -> Runtime {
 	stack := make([dynamic]Primitives, 0)
+	scope := Scope {
+		parent = nil,
+		defs = {"__version__" = 1},
+	}
+
 	return Runtime {
 		stack = stack,
 		defs = {
@@ -105,6 +132,7 @@ new :: proc() -> Runtime {
 			"or" = or_builtin(),
 			"not" = not_builtin(),
 		},
+		scope = scope,
 	}
 }
 
@@ -116,6 +144,12 @@ peek_stack :: proc(stack: Stack) -> (Primitives, bool) {
 }
 
 eval :: proc(rt: ^Runtime, ast: parser.AST) -> Error {
+	// NOTE: currently this define everything inorder
+	// Ideally create graph of dependencies before defining
+	for _, def in ast.defs {
+		define(rt, def)
+	}
+
 	for expr in ast.exprs {
 		val, err := eval_expr(rt, expr)
 		append(&rt.stack, val)
@@ -126,16 +160,37 @@ eval :: proc(rt: ^Runtime, ast: parser.AST) -> Error {
 
 
 eval_expr :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error) {
-	#partial switch _ in expr {
+	switch _ in expr {
 	case parser.Int:
 		return Primitives(expr.(parser.Int)), nil
 	case parser.Bool:
 		return Primitives(expr.(parser.Bool)), nil
-	// i_load(&rt.stack, expr) or_return
+	case parser.Identifier:
+		id := expr.(parser.Identifier)
+		return find_id(rt.scope, id.name)
 	case parser.Function_Call:
 		return invoke(rt, expr)
 	}
 	return nil, nil
+}
+
+define :: proc(rt: ^Runtime, definition: parser.Definition) -> (prim: Primitives, err: Error) {
+	_, is_var_defined := rt.scope.defs[definition.name]
+	_, is_func_defined := rt.defs[definition.name]
+
+	if is_var_defined || is_func_defined {
+		return nil, Already_Defined{definition.name}
+	}
+
+	switch _ in definition.value {
+	case parser.Expr:
+		expr := definition.value.(parser.Expr)
+		rt.scope.defs[definition.name] = eval_expr(rt, expr) or_return
+		return
+	case parser.Function:
+		panic("Unreachable")
+	}
+	panic("Unreachable")
 }
 
 invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error) {
@@ -184,14 +239,11 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 		new_scope.defs[name] = var_args
 	}
 
-	rt.scope = new_scope
-
 	// Invoke the function!
 	#partial switch _ in fn_def {
 	case Builtin_Function:
 		fn := fn_def.(Builtin_Function)
-		result := fn.body(rt.scope) or_return
-		rt.scope = rt.scope.parent^
+		result := fn.body(new_scope) or_return
 		return result, nil
 	}
 
