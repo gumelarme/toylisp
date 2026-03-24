@@ -26,7 +26,11 @@ var_args_collector :: proc(
 	err: Error,
 ) {
 
-	values := scope.defs["values"].([]Primitives)
+	values, ok := scope.defs["values"].([]Primitives)
+	if !ok {
+		return nil, Incorrect_Arity{1, 0}
+	}
+
 	args := make([]B, len(values))
 	defer if err != nil {
 		delete(args)
@@ -161,3 +165,7 @@ equal_builtin :: proc() -> Builtin_Function {
 		},
 	}
 }
+
+// new_add_builtin :: proc() -> Builtin_Function {
+
+// }

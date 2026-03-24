@@ -2,7 +2,6 @@
 
 package rt
 
-import "core:fmt"
 import "src:parser"
 
 Error :: union {
@@ -11,6 +10,7 @@ Error :: union {
 	Incorrect_Arity,
 	Undefined_Name,
 	Already_Defined,
+	Is_Non_Callable,
 }
 
 Insufficient_Stack :: struct {
@@ -34,7 +34,10 @@ Undefined_Name :: struct {
 
 Already_Defined :: struct {
 	name: string,
-	// location: u8
+}
+
+Is_Non_Callable :: struct {
+	name: string,
 }
 
 Primitives :: union {
@@ -49,19 +52,26 @@ Value :: union {
 
 Stack :: [dynamic]Primitives
 
-// Ideally Scope.defs can also contain function
-// so Runtime.defs can be of type scope, but that is too complicated for now
 Scope :: struct {
 	parent: ^Scope,
-	defs:   map[string]Value,
+	defs:   map[string]union {
+		Primitives,
+		[]Primitives,
+		parser.Function,
+		Builtin_Function,
+	},
 }
 
 
 delete_scope :: proc(scope: ^Scope) {
-	for _, v in scope.defs {
-		#partial switch _ in v {
+	for _, def in scope.defs {
+		#partial switch _ in def {
 		case []Primitives:
-			delete_slice(v.([]Primitives))
+			delete(def.([]Primitives))
+		case parser.Function:
+			delete(def.(parser.Function).args)
+		case Builtin_Function:
+			delete(def.(Builtin_Function).args)
 		}
 	}
 
@@ -81,34 +91,17 @@ find_id :: proc(scope: Scope, name: string) -> (prim: Primitives, err: Error) {
 	return nil, Undefined_Name{name}
 }
 
-User_Function :: parser.Function
 Builtin_Function :: struct {
 	args: map[string]parser.Arg,
 	body: proc(scope: Scope) -> (Primitives, Error),
 }
 
-Function :: union {
-	User_Function,
-	Builtin_Function,
-}
-
 Runtime :: struct {
-	defs:  map[string]Function,
 	scope: Scope,
 	stack: Stack,
 }
 
 delete_runtime :: proc(rt: ^Runtime) {
-	for _, fn in rt.defs {
-		switch _ in fn {
-		case User_Function:
-			delete(fn.(User_Function).args)
-		case Builtin_Function:
-			delete(fn.(Builtin_Function).args)
-		}
-	}
-
-	delete_map(rt.defs)
 	delete_scope(&rt.scope)
 	delete_dynamic_array(rt.stack)
 }
@@ -117,12 +110,8 @@ new :: proc() -> Runtime {
 	stack := make([dynamic]Primitives, 0)
 	scope := Scope {
 		parent = nil,
-		defs = {"__version__" = 1},
-	}
-
-	return Runtime {
-		stack = stack,
 		defs = {
+			"__version__" = 1,
 			"+" = add_builtin(),
 			"-" = subtract_builtin(),
 			"*" = multiply_builtin(),
@@ -132,8 +121,9 @@ new :: proc() -> Runtime {
 			"or" = or_builtin(),
 			"not" = not_builtin(),
 		},
-		scope = scope,
 	}
+
+	return Runtime{stack = stack, scope = scope}
 }
 
 peek_stack :: proc(stack: Stack) -> (Primitives, bool) {
@@ -171,12 +161,13 @@ eval_expr :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Er
 	case parser.Function_Call:
 		return invoke(rt, expr)
 	}
-	return nil, nil
+
+	panic("Expr is nil")
 }
 
 define :: proc(rt: ^Runtime, definition: parser.Definition) -> (prim: Primitives, err: Error) {
 	_, is_var_defined := rt.scope.defs[definition.name]
-	_, is_func_defined := rt.defs[definition.name]
+	_, is_func_defined := rt.scope.defs[definition.name]
 
 	if is_var_defined || is_func_defined {
 		return nil, Already_Defined{definition.name}
@@ -195,10 +186,20 @@ define :: proc(rt: ^Runtime, definition: parser.Definition) -> (prim: Primitives
 
 invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error) {
 	fn_call := expr.(parser.Function_Call)
-	fn_def, ok := rt.defs[fn_call.name]
+	fn_def, ok := rt.scope.defs[fn_call.name]
 
 	if !ok {
 		return nil, Undefined_Name{fn_call.name}
+	}
+
+	params: map[string]parser.Arg
+	#partial switch _ in fn_def { 	// why need partial here?
+	case parser.Function:
+		params = fn_def.(parser.Function).args
+	case Builtin_Function:
+		params = fn_def.(Builtin_Function).args
+	case:
+		return nil, Is_Non_Callable{fn_call.name}
 	}
 
 	new_scope := Scope {
@@ -206,14 +207,6 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 	}
 
 	defer delete_scope(&new_scope)
-
-	params: map[string]parser.Arg
-	switch _ in fn_def {
-	case User_Function:
-		params = fn_def.(parser.Function).args
-	case Builtin_Function:
-		params = fn_def.(Builtin_Function).args
-	}
 
 	check_arity(params, fn_call.args) or_return
 
@@ -247,6 +240,7 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 		return result, nil
 	}
 
+	// FIXME: Panic?
 	return nil, nil
 }
 
