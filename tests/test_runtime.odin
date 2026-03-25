@@ -13,7 +13,7 @@ test_number_builtin_function :: proc(t: ^testing.T) {
 	vm := rt.new()
 	defer rt.delete_runtime(&vm)
 	evaluation_err := rt.eval(&vm, tree)
-	result, has_value := rt.peek_stack(vm.stack)
+	result, has_value := rt.pop_stack(&vm.stack)
 
 	testing.expect_value(t, evaluation_err, nil)
 	testing.expect_value(t, has_value, true)
@@ -28,7 +28,7 @@ test_number_builtin_function_nested :: proc(t: ^testing.T) {
 	vm := rt.new()
 	defer rt.delete_runtime(&vm)
 	evaluation_err := rt.eval(&vm, tree)
-	result, has_value := rt.peek_stack(vm.stack)
+	result, has_value := rt.pop_stack(&vm.stack)
 
 	testing.expect_value(t, evaluation_err, nil)
 	testing.expect_value(t, has_value, true)

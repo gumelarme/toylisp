@@ -16,7 +16,7 @@ Function_Call :: struct {
 }
 
 
-Expr :: union {
+Expr :: union #no_nil {
 	Int,
 	Bool,
 	Identifier,

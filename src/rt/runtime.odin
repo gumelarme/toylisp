@@ -126,11 +126,13 @@ new :: proc() -> Runtime {
 	return Runtime{stack = stack, scope = scope}
 }
 
-peek_stack :: proc(stack: Stack) -> (Primitives, bool) {
-	if expect_stack_size(stack, 1) != nil {
+pop_stack :: proc(stack: ^Stack) -> (Primitives, bool) {
+	if expect_stack_size(stack^, 1) != nil {
 		return nil, false
 	}
-	return stack[len(stack) - 1], true
+
+	result := pop(stack)
+	return result, true
 }
 
 eval :: proc(rt: ^Runtime, ast: parser.AST) -> Error {

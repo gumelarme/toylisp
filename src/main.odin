@@ -36,8 +36,8 @@ main :: proc() {
 		}
 
 		line := bufio.scanner_text(&scanner)
-		if line == "quit" {break}
 
+		if line == "quit" {break}
 		result, err := eval(&vm, line)
 
 		if err != nil {
@@ -58,7 +58,7 @@ main :: proc() {
 eval :: proc(vm: ^rt.Runtime, code: string) -> (result: rt.Primitives, err: Error) {
 	ast := parser.parse(code) or_return
 	rt.eval(vm, ast) or_return
-	val, has_value := rt.peek_stack(vm.stack)
+	val, has_value := rt.pop_stack(&vm.stack)
 
 	if !has_value {
 		return nil, rt.Error(rt.Insufficient_Stack{1, 0})
