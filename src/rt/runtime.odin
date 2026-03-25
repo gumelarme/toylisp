@@ -50,6 +50,16 @@ Value :: union {
 	[]Primitives,
 }
 
+Native_Func_Body :: proc(scope: Scope) -> (Primitives, Error)
+
+Function :: struct {
+	params: map[string]parser.Arg,
+	body:   union {
+		parser.Expr,
+		Native_Func_Body,
+	},
+}
+
 Stack :: [dynamic]Primitives
 
 Scope :: struct {
@@ -57,8 +67,7 @@ Scope :: struct {
 	defs:   map[string]union {
 		Primitives,
 		[]Primitives,
-		parser.Function,
-		Builtin_Function,
+		Function,
 	},
 }
 
@@ -68,10 +77,8 @@ delete_scope :: proc(scope: ^Scope) {
 		#partial switch _ in def {
 		case []Primitives:
 			delete(def.([]Primitives))
-		case parser.Function:
-			delete(def.(parser.Function).args)
-		case Builtin_Function:
-			delete(def.(Builtin_Function).args)
+		case Function:
+			delete(def.(Function).params)
 		}
 	}
 
@@ -91,10 +98,6 @@ find_id :: proc(scope: Scope, name: string) -> (prim: Primitives, err: Error) {
 	return nil, Undefined_Name{name}
 }
 
-Builtin_Function :: struct {
-	args: map[string]parser.Arg,
-	body: proc(scope: Scope) -> (Primitives, Error),
-}
 
 Runtime :: struct {
 	scope: Scope,
@@ -194,12 +197,10 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 		return nil, Undefined_Name{fn_call.name}
 	}
 
-	params: map[string]parser.Arg
-	#partial switch _ in fn_def { 	// why need partial here?
-	case parser.Function:
-		params = fn_def.(parser.Function).args
-	case Builtin_Function:
-		params = fn_def.(Builtin_Function).args
+	fn: Function
+	#partial switch _ in fn_def {
+	case Function:
+		fn = fn_def.(Function)
 	case:
 		return nil, Is_Non_Callable{fn_call.name}
 	}
@@ -209,12 +210,11 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 	}
 
 	defer delete_scope(&new_scope)
+	check_arity(fn.params, fn_call.args) or_return
 
-	check_arity(params, fn_call.args) or_return
-
-	// Put argument into the scope
+	// Put the argument into the scope
 	arg_pos := 0
-	for name, kind in params {
+	for name, kind in fn.params {
 		if kind == .PosArg {
 			val := eval_expr(rt, fn_call.args[arg_pos]) or_return
 			new_scope.defs[name] = val
@@ -222,8 +222,7 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 			continue
 		}
 
-		//VarArgs
-		var_arg_count := len(fn_call.args) - len(params) + 1
+		var_arg_count := len(fn_call.args) - len(fn.params) + 1
 		var_args := make([]Primitives, var_arg_count)
 
 		for offset in 0 ..< var_arg_count {
@@ -235,10 +234,10 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 	}
 
 	// Invoke the function!
-	#partial switch _ in fn_def {
-	case Builtin_Function:
-		fn := fn_def.(Builtin_Function)
-		result := fn.body(new_scope) or_return
+	#partial switch _ in fn.body {
+	case Native_Func_Body:
+		body := fn.body.(Native_Func_Body)
+		result := body(new_scope) or_return
 		return result, nil
 	}
 

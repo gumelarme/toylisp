@@ -49,9 +49,9 @@ var_args_collector :: proc(
 	return args, nil
 }
 
-add_builtin :: proc() -> Builtin_Function {
-	return Builtin_Function {
-		args = {"values" = .VarArg},
+add_builtin :: proc() -> Function {
+	return Function {
+		params = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Int, int) or_return
 			defer delete(args)
@@ -63,9 +63,9 @@ add_builtin :: proc() -> Builtin_Function {
 	}
 }
 
-subtract_builtin :: proc() -> Builtin_Function {
-	return Builtin_Function {
-		args = {"values" = .VarArg},
+subtract_builtin :: proc() -> Function {
+	return Function {
+		params = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Int, int) or_return
 			defer delete(args)
@@ -77,9 +77,9 @@ subtract_builtin :: proc() -> Builtin_Function {
 	}
 }
 
-multiply_builtin :: proc() -> Builtin_Function {
-	return Builtin_Function {
-		args = {"values" = .VarArg},
+multiply_builtin :: proc() -> Function {
+	return Function {
+		params = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Int, int) or_return
 			defer delete(args)
@@ -91,9 +91,9 @@ multiply_builtin :: proc() -> Builtin_Function {
 	}
 }
 
-division_builtin :: proc() -> Builtin_Function {
-	return Builtin_Function {
-		args = {"values" = .VarArg},
+division_builtin :: proc() -> Function {
+	return Function {
+		params = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Int, int) or_return
 			defer delete(args)
@@ -107,9 +107,9 @@ division_builtin :: proc() -> Builtin_Function {
 
 // -- Bool builtin functions
 
-and_builtin :: proc() -> Builtin_Function {
-	return Builtin_Function {
-		args = {"values" = .VarArg},
+and_builtin :: proc() -> Function {
+	return Function {
+		params = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Bool, bool) or_return
 			defer delete(args)
@@ -121,9 +121,9 @@ and_builtin :: proc() -> Builtin_Function {
 	}
 }
 
-or_builtin :: proc() -> Builtin_Function {
-	return Builtin_Function {
-		args = {"values" = .VarArg},
+or_builtin :: proc() -> Function {
+	return Function {
+		params = {"values" = .VarArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			args := var_args_collector(scope, parser.Bool, bool) or_return
 			defer delete(args)
@@ -135,9 +135,9 @@ or_builtin :: proc() -> Builtin_Function {
 	}
 }
 
-not_builtin :: proc() -> Builtin_Function {
-	return Builtin_Function {
-		args = {"pred" = .PosArg},
+not_builtin :: proc() -> Function {
+	return Function {
+		params = {"pred" = .PosArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			arg := scope.defs["pred"].(Primitives)
 
@@ -147,9 +147,9 @@ not_builtin :: proc() -> Builtin_Function {
 	}
 }
 
-equal_builtin :: proc() -> Builtin_Function {
-	return Builtin_Function {
-		args = {"a" = .PosArg, "b" = .PosArg},
+equal_builtin :: proc() -> Function {
+	return Function {
+		params = {"a" = .PosArg, "b" = .PosArg},
 		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
 			a := scope.defs["a"].(Primitives)
 			b := scope.defs["b"].(Primitives)
@@ -166,6 +166,6 @@ equal_builtin :: proc() -> Builtin_Function {
 	}
 }
 
-// new_add_builtin :: proc() -> Builtin_Function {
+// new_add_builtin :: proc() -> Function {
 
 // }
