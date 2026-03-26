@@ -87,6 +87,16 @@ Scope :: struct {
 	defs:   map[string]Value,
 }
 
+define :: proc(scope: ^Scope, name: string, value: Value, shadow: bool = false) -> Error {
+	_, is_defined := scope.defs[name]
+	if is_defined && !shadow {
+		return Already_Defined{name}
+	}
+
+	scope.defs[name] = value
+	return nil
+}
+
 
 delete_scope :: proc(scope: ^Scope) {
 	for _, def in scope.defs {
@@ -150,6 +160,7 @@ new :: proc() -> Runtime {
 			"inc" = inc_builtin(),
 			"dec" = dec_builtin(),
 			"def" = def_builtin(),
+			"defn" = defn_builtin(),
 		},
 	}
 

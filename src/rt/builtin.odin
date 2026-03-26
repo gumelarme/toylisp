@@ -49,6 +49,15 @@ var_args_collector :: proc(
 	return args, nil
 }
 
+expect_expr_type :: proc(expr: parser.Expr, $T: typeid) -> (T, Error) {
+	name_arg_type := reflect.union_variant_typeid(expr)
+	if name_arg_type != T {
+		return T{}, Type_Mismatch{T, name_arg_type}
+	}
+
+	return expr.(T), nil
+}
+
 def_builtin :: proc() -> Function {
 	return Function {
 		params = {"name" = .PosArg, "value" = .PosArg},
@@ -59,20 +68,44 @@ def_builtin :: proc() -> Function {
 				root = scope.parent
 			}
 
-			name_arg_type := reflect.union_variant_typeid(raw_expr[0])
-			if name_arg_type != parser.Identifier {
-				return nil, Type_Mismatch{parser.Identifier, name_arg_type}
-			}
-
-			name := string(raw_expr[0].(parser.Identifier))
-			_, is_defined := scope.defs[name]
-			if is_defined {
-				return nil, Already_Defined{name}
-			}
-
+			name := expect_expr_type(raw_expr[0], parser.Identifier) or_return
 			value := eval_expr(root, raw_expr[1]) or_return
-			root.defs[name] = value
 
+			err = define(root, string(name), value, shadow = false)
+			if err != nil {
+				return nil, err
+			}
+			return Primitives(parser.Bool(true)), nil
+		},
+	}
+}
+
+defn_builtin :: proc() -> Function {
+	return Function {
+		params = {"name" = .PosArg, "params" = .PosArg, "body" = .PosArg},
+		body = proc(scope: ^Scope, raw_expr: []parser.Expr) -> (prim: Primitives, err: Error) {
+			//find root scope
+			root := scope
+			for root.parent != nil {
+				root = scope.parent
+			}
+
+			name := expect_expr_type(raw_expr[0], parser.Identifier) or_return
+
+			// check all params are Identifier
+			params_expr := expect_expr_type(raw_expr[1], []parser.Expr) or_return
+			params := make(map[string]Arg)
+			for p in params_expr {
+				arg_name := expect_expr_type(p, parser.Identifier) or_return
+				params[string(arg_name)] = .PosArg // TODO: Implement .VarArg
+			}
+
+			func := Function {
+				params = params,
+				body   = raw_expr[2],
+			}
+
+			err = define(root, string(name), func, shadow = false)
 			return Primitives(parser.Bool(true)), nil
 		},
 	}
