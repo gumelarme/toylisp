@@ -1,10 +1,11 @@
 # Toy lisp
 
 ## Features
-- [x] Ints with `+` `-` `*` `/`
-- [-] Bools with `and` `or` `not` 
+- [x] Ints with `+` `-` `*` `/` `>` `<` `=` `inc` `dec`
+- [x] Bools with `and` `or` `not` 
+- [-] Flow control with `if`
 - [x] repl
-- [ ]`string`
+- [x] function declaration with `defn`
+- [x] global variable declaration with `def`
+- [ ] `string`
 - [ ] `list`
-- [ ] function declaration
-- [ ] global variable declaration 
