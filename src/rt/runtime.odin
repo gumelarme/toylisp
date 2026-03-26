@@ -57,12 +57,21 @@ Arg :: enum {
 	VarArg,
 }
 
-Native_Func_Body :: proc(scope: Scope) -> (Primitives, Error)
+
+Internal_Func :: proc(scope: ^Scope, raw_expr: []parser.Expr) -> (Primitives, Error)
+Native_Func :: proc(scope: Scope) -> (Primitives, Error)
+
+// Function has 3 body variant:
+//  - Internal_Func: read & write scope, evaluate expr directly (to implement `def` `defn`)
+//  - Native_Func: read only scope, body are implemented in Odin
+//  - Expr: read only scope, are the user defined function using the lisp expresion
+// naming things are hard :(
 Function :: struct {
 	params: map[string]Arg,
 	body:   union {
 		parser.Expr,
-		Native_Func_Body,
+		Native_Func,
+		Internal_Func,
 	},
 }
 
@@ -140,6 +149,7 @@ new :: proc() -> Runtime {
 			"not" = not_builtin(),
 			"inc" = inc_builtin(),
 			"dec" = dec_builtin(),
+			"def" = def_builtin(),
 		},
 	}
 
@@ -225,18 +235,51 @@ invoke :: proc(scope: ^Scope, fn_call: Function_Call) -> (prim: Primitives, err:
 		return nil, Is_Non_Callable{fn_call.name}
 	}
 
-	new_scope := Scope {
-		parent = scope,
+	// Invoke the function!
+	switch _ in fn.body {
+	case parser.Expr:
+		new_scope := make_fn_call_scope(scope, fn, fn_call) or_return
+		defer delete_scope(&new_scope)
+
+		body := fn.body.(parser.Expr)
+		return eval_expr(&new_scope, body)
+
+	case Native_Func:
+		new_scope := make_fn_call_scope(scope, fn, fn_call) or_return
+		defer delete_scope(&new_scope)
+
+		body := fn.body.(Native_Func)
+		result := body(new_scope) or_return
+		return result, nil
+
+	case Internal_Func:
+		check_arity(fn.params, fn_call.args) or_return
+		body := fn.body.(Internal_Func)
+		return body(scope, fn_call.args)
 	}
 
-	defer delete_scope(&new_scope)
+	// FIXME: Panic?
+	return nil, nil
+}
+
+
+make_fn_call_scope :: proc(
+	parent_scope: ^Scope,
+	fn: Function,
+	fn_call: Function_Call,
+) -> (
+	new_scope: Scope,
+	err: Error,
+) {
+
+	new_scope = Scope{parent_scope, nil}
 	check_arity(fn.params, fn_call.args) or_return
 
 	// Put the argument into the scope
 	arg_pos := 0
 	for name, kind in fn.params {
 		if kind == .PosArg {
-			val := eval_expr(scope, fn_call.args[arg_pos]) or_return
+			val := eval_expr(parent_scope, fn_call.args[arg_pos]) or_return
 			new_scope.defs[name] = val
 			arg_pos += 1
 			continue
@@ -247,30 +290,14 @@ invoke :: proc(scope: ^Scope, fn_call: Function_Call) -> (prim: Primitives, err:
 
 		for offset in 0 ..< var_arg_count {
 			arg := fn_call.args[arg_pos + offset]
-			val, _err := eval_expr(scope, arg)
-			if _err != nil {
-				return nil, err
-			}
+			val := eval_expr(parent_scope, arg) or_return
 			var_args[offset] = val
 		}
 
 		new_scope.defs[name] = var_args
 	}
 
-	// Invoke the function!
-	switch _ in fn.body {
-	case parser.Expr:
-		body := fn.body.(parser.Expr)
-		return eval_expr(&new_scope, body)
-
-	case Native_Func_Body:
-		body := fn.body.(Native_Func_Body)
-		result := body(new_scope) or_return
-		return result, nil
-	}
-
-	// FIXME: Panic?
-	return nil, nil
+	return new_scope, nil
 }
 
 check_arity :: proc(params: map[string]Arg, args: []parser.Expr) -> Error {

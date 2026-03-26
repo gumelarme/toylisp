@@ -49,6 +49,35 @@ var_args_collector :: proc(
 	return args, nil
 }
 
+def_builtin :: proc() -> Function {
+	return Function {
+		params = {"name" = .PosArg, "value" = .PosArg},
+		body = proc(scope: ^Scope, raw_expr: []parser.Expr) -> (prim: Primitives, err: Error) {
+			//find root scope
+			root := scope
+			for root.parent != nil {
+				root = scope.parent
+			}
+
+			name_arg_type := reflect.union_variant_typeid(raw_expr[0])
+			if name_arg_type != parser.Identifier {
+				return nil, Type_Mismatch{parser.Identifier, name_arg_type}
+			}
+
+			name := string(raw_expr[0].(parser.Identifier))
+			_, is_defined := scope.defs[name]
+			if is_defined {
+				return nil, Already_Defined{name}
+			}
+
+			value := eval_expr(root, raw_expr[1]) or_return
+			root.defs[name] = value
+
+			return Primitives(parser.Bool(true)), nil
+		},
+	}
+}
+
 add_builtin :: proc() -> Function {
 	return Function {
 		params = {"values" = .VarArg},
