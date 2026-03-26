@@ -18,7 +18,7 @@ test_parser_function_call_simple :: proc(t: ^testing.T) {
 
 	eq := parser.is_expression_equal(
 		ast.exprs[0],
-		[]parser.Expr{parser.Identifier{"+"}, parser.Int(1), parser.Int(2), parser.Int(3)},
+		[]parser.Expr{parser.Identifier("+"), parser.Int(1), parser.Int(2), parser.Int(3)},
 	)
 
 	testing.expect_value(t, err, nil)
@@ -36,10 +36,10 @@ test_parser_function_call_nested :: proc(t: ^testing.T) {
 	// 	args = ,
 	// }
 
-	mul := []parser.Expr{parser.Identifier{"*"}, parser.Int(3), parser.Int(4)}
+	mul := []parser.Expr{parser.Identifier("*"), parser.Int(3), parser.Int(4)}
 	eq := parser.is_expression_equal(
 		ast.exprs[0],
-		[]parser.Expr{parser.Identifier{"+"}, parser.Int(1), parser.Int(2), mul},
+		[]parser.Expr{parser.Identifier("+"), parser.Int(1), parser.Int(2), mul},
 	)
 
 

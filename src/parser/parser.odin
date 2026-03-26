@@ -5,10 +5,7 @@ import "core:strings"
 
 Int :: distinct int
 Bool :: distinct bool
-
-Identifier :: struct {
-	name: string,
-}
+Identifier :: distinct string
 
 Expr :: union {
 	Int,
@@ -130,7 +127,7 @@ parse_identifier :: proc(p: ^Parser) -> (expr: Expr, err: Error) {
 	tok := p.tokens[p.cursor]
 	p.cursor += 1
 
-	return Identifier{strings.clone(tok.value)}, nil
+	return Identifier(strings.clone(tok.value)), nil
 }
 
 
@@ -144,7 +141,7 @@ is_expression_equal :: proc(a, b: Expr) -> bool {
 	// TODO: compare []Expr
 	switch _ in a {
 	case Identifier:
-		return a.(Identifier).name == b.(Identifier).name
+		return a.(Identifier) == b.(Identifier)
 	case Int:
 		return a.(Int) == b.(Int)
 	case Bool:
@@ -172,7 +169,7 @@ is_expression_equal :: proc(a, b: Expr) -> bool {
 delete_expression :: proc(expr: Expr) {
 	#partial switch _ in expr {
 	case Identifier:
-		delete(expr.(Identifier).name)
+		delete(string(expr.(Identifier)))
 	case []Expr:
 		list := expr.([]Expr)
 		for e in list {

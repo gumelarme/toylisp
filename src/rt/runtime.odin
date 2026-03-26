@@ -185,7 +185,7 @@ eval_expr :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, err: E
 
 eval_variable :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, err: Error) {
 	id := expr.(parser.Identifier)
-	value := find_id(scope^, id.name) or_return
+	value := find_id(scope^, string(id)) or_return
 
 	switch _ in value {
 	case Primitives:
@@ -205,7 +205,7 @@ eval_list :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, err: E
 	#partial switch _ in head {
 	case parser.Identifier:
 		id := head.(parser.Identifier)
-		fn_call := Function_Call{id.name, rest}
+		fn_call := Function_Call{string(id), rest}
 		return invoke(scope, fn_call)
 	case:
 		panic("Array is not implemented yet :(")
