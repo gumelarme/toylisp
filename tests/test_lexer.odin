@@ -104,7 +104,7 @@ test_lexer_from_file :: proc(t: ^testing.T) {
 	tokens, err := parser.tokenize(&source)
 	defer parser.delete_tokens(tokens)
 	testing.expect_value(t, err, nil)
-	testing.expect_value(t, source.line, 6)
+	testing.expect_value(t, source.line, 7)
 	testing.expect_value(t, source.column, 7)
 }
 

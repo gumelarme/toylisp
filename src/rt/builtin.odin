@@ -245,6 +245,54 @@ equal_builtin :: proc() -> Function {
 	}
 }
 
+
+greater_than_builtin :: proc() -> Function {
+	return Function {
+		params = {"a" = .PosArg, "b" = .PosArg},
+		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
+			a := scope.defs["a"].(Primitives)
+			b := scope.defs["b"].(Primitives)
+
+			type_a := reflect.union_variant_typeid(a)
+			type_b := reflect.union_variant_typeid(b)
+			if type_a != parser.Int {
+				return nil, Type_Mismatch{parser.Int, type_a}
+			}
+
+			if type_b != parser.Int {
+				return nil, Type_Mismatch{parser.Int, type_b}
+			}
+
+			result := int(a.(parser.Int)) > int(b.(parser.Int))
+			return Primitives(parser.Bool(result)), nil
+		},
+	}
+}
+
+less_than_builtin :: proc() -> Function {
+	return Function {
+		params = {"a" = .PosArg, "b" = .PosArg},
+		body = proc(scope: Scope) -> (prim: Primitives, err: Error) {
+			a := scope.defs["a"].(Primitives)
+			b := scope.defs["b"].(Primitives)
+
+			type_a := reflect.union_variant_typeid(a)
+			type_b := reflect.union_variant_typeid(b)
+			if type_a != parser.Int {
+				return nil, Type_Mismatch{parser.Int, type_a}
+			}
+
+			if type_b != parser.Int {
+				return nil, Type_Mismatch{parser.Int, type_b}
+			}
+
+			result := int(a.(parser.Int)) < int(b.(parser.Int))
+			return Primitives(parser.Bool(result)), nil
+		},
+	}
+}
+
+
 inc_builtin :: proc() -> Function {
 	fn := make([]parser.Expr, 3)
 	fn[0] = parser.Identifier("+")

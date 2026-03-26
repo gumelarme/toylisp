@@ -152,6 +152,8 @@ new :: proc() -> Runtime {
 			"-" = subtract_builtin(),
 			"*" = multiply_builtin(),
 			"/" = division_builtin(),
+			">" = greater_than_builtin(),
+			"<" = less_than_builtin(),
 			"=" = equal_builtin(),
 			"and" = and_builtin(),
 			"or" = or_builtin(),
