@@ -51,14 +51,24 @@ Value :: union {
 	[]Primitives,
 }
 
-Native_Func_Body :: proc(scope: Scope) -> (Primitives, Error)
 
+Arg :: enum {
+	PosArg,
+	VarArg,
+}
+
+Native_Func_Body :: proc(scope: Scope) -> (Primitives, Error)
 Function :: struct {
-	params: map[string]parser.Arg,
+	params: map[string]Arg,
 	body:   union {
 		parser.Expr,
 		Native_Func_Body,
 	},
+}
+
+Function_Call :: struct {
+	name: string,
+	args: []parser.Expr,
 }
 
 Stack :: [dynamic]Primitives
@@ -81,10 +91,9 @@ delete_scope :: proc(scope: ^Scope) {
 			#partial switch _ in fn.body {
 			case parser.Expr:
 				// FIXME: could not use delete_expression
-				// because its also delete func.name,
-				// while hardcoded user function names are automatically cleared
-				// and parsed user function need to be clearead manually
-				delete(fn.body.(parser.Expr).(parser.Function_Call).args)
+				// while native body function are automatically cleared,
+				// hardcoded expression body function need to be clearead manually
+				delete(fn.body.(parser.Expr).([]parser.Expr))
 			}
 		}
 	}
@@ -104,7 +113,6 @@ find_id :: proc(scope: Scope, name: string) -> (val: Value, err: Error) {
 
 	return nil, Undefined_Name{name}
 }
-
 
 Runtime :: struct {
 	scope: Scope,
@@ -130,8 +138,8 @@ new :: proc() -> Runtime {
 			"and" = and_builtin(),
 			"or" = or_builtin(),
 			"not" = not_builtin(),
-			"inc" = inc(),
-			"dec" = dec(),
+			"inc" = inc_builtin(),
+			"dec" = dec_builtin(),
 		},
 	}
 
@@ -149,12 +157,6 @@ pop_stack :: proc(stack: ^Stack) -> (Primitives, bool) {
 }
 
 eval :: proc(rt: ^Runtime, ast: parser.AST) -> Error {
-	// NOTE: currently this define everything inorder
-	// Ideally create graph of dependencies before defining
-	for _, def in ast.defs {
-		define(rt, def)
-	}
-
 	for expr in ast.exprs {
 		val, err := eval_expr(&rt.scope, expr)
 		append(&rt.stack, val)
@@ -172,8 +174,8 @@ eval_expr :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, err: E
 		return Primitives(expr.(parser.Bool)), nil
 	case parser.Identifier:
 		return eval_variable(scope, expr)
-	case parser.Function_Call:
-		return invoke(scope, expr)
+	case []parser.Expr:
+		return eval_list(scope, expr)
 	case:
 		panic("Somethings wrong")
 	}
@@ -195,27 +197,24 @@ eval_variable :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, er
 	panic("What should i do??")
 }
 
-define :: proc(rt: ^Runtime, definition: parser.Definition) -> (prim: Primitives, err: Error) {
-	_, is_var_defined := rt.scope.defs[definition.name]
-	_, is_func_defined := rt.scope.defs[definition.name]
+// FIXME: every eval_ signature should be type of Value
+eval_list :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, err: Error) {
+	list := expr.([]parser.Expr)
+	head, rest := list[0], list[1:]
 
-	if is_var_defined || is_func_defined {
-		return nil, Already_Defined{definition.name}
+	#partial switch _ in head {
+	case parser.Identifier:
+		id := head.(parser.Identifier)
+		fn_call := Function_Call{id.name, rest}
+		return invoke(scope, fn_call)
+	case:
+		panic("Array is not implemented yet :(")
 	}
 
-	switch _ in definition.value {
-	case parser.Expr:
-		expr := definition.value.(parser.Expr)
-		rt.scope.defs[definition.name] = eval_expr(&rt.scope, expr) or_return
-		return
-	case parser.Function:
-		panic("Unreachable")
-	}
 	panic("Unreachable")
 }
 
-invoke :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, err: Error) {
-	fn_call := expr.(parser.Function_Call)
+invoke :: proc(scope: ^Scope, fn_call: Function_Call) -> (prim: Primitives, err: Error) {
 	fn_def := find_id(scope^, fn_call.name) or_return
 
 	fn: Function
@@ -274,7 +273,7 @@ invoke :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, err: Erro
 	return nil, nil
 }
 
-check_arity :: proc(params: map[string]parser.Arg, args: []parser.Expr) -> Error {
+check_arity :: proc(params: map[string]Arg, args: []parser.Expr) -> Error {
 	param_count, args_count := len(params), len(args)
 	pos_param_count, var_param_count := 0, 0
 

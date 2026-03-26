@@ -25,8 +25,6 @@ TType :: enum {
 	Identifier,
 	Int,
 	Bool,
-	// we dont have macros here, so def & defn is a keyword
-	Keyword,
 }
 
 Token :: struct {
@@ -220,11 +218,8 @@ lex_identifier :: proc(lex: ^Lexer) -> Token {
 	}
 
 	tok := consume(lex, .Identifier)
-	switch tok.value {
-	case "true", "false":
+	if tok.value == "true" || tok.value == "false" {
 		tok.type = .Bool
-	case "def", "defn":
-		tok.type = .Keyword
 	}
 	return tok
 }

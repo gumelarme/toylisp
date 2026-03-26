@@ -143,14 +143,14 @@ test_parse_keyword :: proc(t: ^testing.T) {
 	expected := []parser.Token {
 		// First line
 		{.Left_Paren, "(", 1, 1},
-		{.Keyword, "def", 1, 2},
+		{.Identifier, "def", 1, 2},
 		{.Identifier, "x", 1, 6},
 		{.Int, "1", 1, 8},
 		{.Right_Paren, ")", 1, 9},
 
 		// Second line
 		{.Left_Paren, "(", 2, 1},
-		{.Keyword, "defn", 2, 2},
+		{.Identifier, "defn", 2, 2},
 		{.Identifier, "a", 2, 7},
 		{.Left_Paren, "(", 2, 9},
 		{.Right_Paren, ")", 2, 10},
