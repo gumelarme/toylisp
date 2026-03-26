@@ -166,6 +166,24 @@ equal_builtin :: proc() -> Function {
 	}
 }
 
-// new_add_builtin :: proc() -> Function {
+inc :: proc() -> Function {
+	args := make([]parser.Expr, 2)
+	args[0] = parser.Identifier{"value"}
+	args[1] = parser.Int(1)
 
-// }
+	return Function {
+		params = {"value" = .PosArg},
+		body = parser.Expr(parser.Function_Call{name = "+", args = args[:]}),
+	}
+}
+
+dec :: proc() -> Function {
+	args := make([]parser.Expr, 2)
+	args[0] = parser.Identifier{"value"}
+	args[1] = parser.Int(1)
+
+	return Function {
+		params = {"value" = .PosArg},
+		body = parser.Expr(parser.Function_Call{name = "-", args = args[:]}),
+	}
+}

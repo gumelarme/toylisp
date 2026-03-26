@@ -16,7 +16,7 @@ Function_Call :: struct {
 }
 
 
-Expr :: union #no_nil {
+Expr :: union {
 	Int,
 	Bool,
 	Identifier,
@@ -295,7 +295,7 @@ delete_expression :: proc(expr: Expr) {
 		for arg in func.args {
 			delete_expression(arg)
 		}
-		delete(func.name)
 		delete(func.args)
+		delete(func.name)
 	}
 }

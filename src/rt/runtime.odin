@@ -46,6 +46,7 @@ Primitives :: union {
 }
 
 Value :: union {
+	Function,
 	Primitives,
 	[]Primitives,
 }
@@ -64,11 +65,7 @@ Stack :: [dynamic]Primitives
 
 Scope :: struct {
 	parent: ^Scope,
-	defs:   map[string]union {
-		Primitives,
-		[]Primitives,
-		Function,
-	},
+	defs:   map[string]Value,
 }
 
 
@@ -78,17 +75,27 @@ delete_scope :: proc(scope: ^Scope) {
 		case []Primitives:
 			delete(def.([]Primitives))
 		case Function:
-			delete(def.(Function).params)
+			fn := def.(Function)
+			delete(fn.params)
+
+			#partial switch _ in fn.body {
+			case parser.Expr:
+				// FIXME: could not use delete_expression
+				// because its also delete func.name,
+				// while hardcoded user function names are automatically cleared
+				// and parsed user function need to be clearead manually
+				delete(fn.body.(parser.Expr).(parser.Function_Call).args)
+			}
 		}
 	}
 
 	delete_map(scope.defs)
 }
 
-find_id :: proc(scope: Scope, name: string) -> (prim: Primitives, err: Error) {
+find_id :: proc(scope: Scope, name: string) -> (val: Value, err: Error) {
 	value, found := scope.defs[name]
 	if found {
-		return value.(Primitives), nil
+		return value, nil
 	}
 
 	if scope.parent != nil {
@@ -123,11 +130,14 @@ new :: proc() -> Runtime {
 			"and" = and_builtin(),
 			"or" = or_builtin(),
 			"not" = not_builtin(),
+			"inc" = inc(),
+			"dec" = dec(),
 		},
 	}
 
 	return Runtime{stack = stack, scope = scope}
 }
+
 
 pop_stack :: proc(stack: ^Stack) -> (Primitives, bool) {
 	if expect_stack_size(stack^, 1) != nil {
@@ -146,7 +156,7 @@ eval :: proc(rt: ^Runtime, ast: parser.AST) -> Error {
 	}
 
 	for expr in ast.exprs {
-		val, err := eval_expr(rt, expr)
+		val, err := eval_expr(&rt.scope, expr)
 		append(&rt.stack, val)
 		return err
 	}
@@ -154,20 +164,35 @@ eval :: proc(rt: ^Runtime, ast: parser.AST) -> Error {
 }
 
 
-eval_expr :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error) {
+eval_expr :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, err: Error) {
 	switch _ in expr {
 	case parser.Int:
 		return Primitives(expr.(parser.Int)), nil
 	case parser.Bool:
 		return Primitives(expr.(parser.Bool)), nil
 	case parser.Identifier:
-		id := expr.(parser.Identifier)
-		return find_id(rt.scope, id.name)
+		return eval_variable(scope, expr)
 	case parser.Function_Call:
-		return invoke(rt, expr)
+		return invoke(scope, expr)
+	case:
+		panic("Somethings wrong")
 	}
 
 	panic("Expr is nil")
+}
+
+eval_variable :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, err: Error) {
+	id := expr.(parser.Identifier)
+	value := find_id(scope^, id.name) or_return
+
+	switch _ in value {
+	case Primitives:
+		return value.(Primitives), nil
+	case Function, []Primitives:
+		return nil, Type_Mismatch{expected = typeid_of(type_of(value)), got = typeid_of(Function)}
+	}
+
+	panic("What should i do??")
 }
 
 define :: proc(rt: ^Runtime, definition: parser.Definition) -> (prim: Primitives, err: Error) {
@@ -181,7 +206,7 @@ define :: proc(rt: ^Runtime, definition: parser.Definition) -> (prim: Primitives
 	switch _ in definition.value {
 	case parser.Expr:
 		expr := definition.value.(parser.Expr)
-		rt.scope.defs[definition.name] = eval_expr(rt, expr) or_return
+		rt.scope.defs[definition.name] = eval_expr(&rt.scope, expr) or_return
 		return
 	case parser.Function:
 		panic("Unreachable")
@@ -189,13 +214,9 @@ define :: proc(rt: ^Runtime, definition: parser.Definition) -> (prim: Primitives
 	panic("Unreachable")
 }
 
-invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error) {
+invoke :: proc(scope: ^Scope, expr: parser.Expr) -> (prim: Primitives, err: Error) {
 	fn_call := expr.(parser.Function_Call)
-	fn_def, ok := rt.scope.defs[fn_call.name]
-
-	if !ok {
-		return nil, Undefined_Name{fn_call.name}
-	}
+	fn_def := find_id(scope^, fn_call.name) or_return
 
 	fn: Function
 	#partial switch _ in fn_def {
@@ -206,7 +227,7 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 	}
 
 	new_scope := Scope {
-		parent = &rt.scope,
+		parent = scope,
 	}
 
 	defer delete_scope(&new_scope)
@@ -216,7 +237,7 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 	arg_pos := 0
 	for name, kind in fn.params {
 		if kind == .PosArg {
-			val := eval_expr(rt, fn_call.args[arg_pos]) or_return
+			val := eval_expr(scope, fn_call.args[arg_pos]) or_return
 			new_scope.defs[name] = val
 			arg_pos += 1
 			continue
@@ -226,7 +247,11 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 		var_args := make([]Primitives, var_arg_count)
 
 		for offset in 0 ..< var_arg_count {
-			val := eval_expr(rt, fn_call.args[arg_pos + offset]) or_return
+			arg := fn_call.args[arg_pos + offset]
+			val, _err := eval_expr(scope, arg)
+			if _err != nil {
+				return nil, err
+			}
 			var_args[offset] = val
 		}
 
@@ -234,7 +259,11 @@ invoke :: proc(rt: ^Runtime, expr: parser.Expr) -> (prim: Primitives, err: Error
 	}
 
 	// Invoke the function!
-	#partial switch _ in fn.body {
+	switch _ in fn.body {
+	case parser.Expr:
+		body := fn.body.(parser.Expr)
+		return eval_expr(&new_scope, body)
+
 	case Native_Func_Body:
 		body := fn.body.(Native_Func_Body)
 		result := body(new_scope) or_return

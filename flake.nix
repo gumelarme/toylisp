@@ -18,6 +18,8 @@
           buildInputs = with pkgs; [
             odin
             gnumake
+
+            lldb
           ];
         };
       }
