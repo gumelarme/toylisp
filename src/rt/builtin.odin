@@ -111,6 +111,23 @@ defn_builtin :: proc() -> Function {
 	}
 }
 
+if_builtin :: proc() -> Function {
+	return Function {
+		params = {"pred" = .PosArg, "then" = .PosArg, "else" = .PosArg},
+		body = proc(scope: ^Scope, raw_expr: []parser.Expr) -> (prim: Primitives, err: Error) {
+			pred := eval_expr(scope, raw_expr[0]) or_return
+
+			pred_type := reflect.union_variant_typeid(pred)
+			if pred_type != parser.Bool {
+				return nil, Type_Mismatch{parser.Bool, pred_type}
+			}
+
+			body := raw_expr[1] if bool(pred.(parser.Bool)) else raw_expr[2]
+			return eval_expr(scope, body)
+		},
+	}
+}
+
 add_builtin :: proc() -> Function {
 	return Function {
 		params = {"values" = .VarArg},

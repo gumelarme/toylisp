@@ -92,7 +92,6 @@ define :: proc(scope: ^Scope, name: string, value: Value, shadow: bool = false) 
 	if is_defined && !shadow {
 		return Already_Defined{name}
 	}
-
 	scope.defs[name] = value
 	return nil
 }
@@ -161,6 +160,7 @@ new :: proc() -> Runtime {
 			"dec" = dec_builtin(),
 			"def" = def_builtin(),
 			"defn" = defn_builtin(),
+			"if" = if_builtin(),
 		},
 	}
 
